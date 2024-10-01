@@ -8,6 +8,7 @@ dependencies = [
     "instructor>=1.4.1",
     "openai>=1.50.2",
     "pip>=24.2",
+    "pillow>=10.4.0",
     "python-dotenv>=1.0.1",
     "weave>=0.51.12",
     "uv>=0.4.17",
