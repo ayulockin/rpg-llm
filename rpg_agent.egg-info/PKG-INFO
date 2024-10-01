@@ -1,0 +1,20 @@
+Metadata-Version: 2.1
+Name: rpg_agent
+Version: 0.0.1
+Summary: An agent that helps you play Divinity Original Sin II.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: instructor>=1.4.1
+Requires-Dist: openai>=1.50.2
+Requires-Dist: pip>=24.2
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: weave>=0.51.12
+Requires-Dist: uv>=0.4.17
+Requires-Dist: black>=24.8.0
+Requires-Dist: isort>=5.13.2
+Requires-Dist: pytest>=8.3.3
+Requires-Dist: ruff>=0.6.8
+
+# rpg-llm
+A framework to play Divinity Original Sin 2

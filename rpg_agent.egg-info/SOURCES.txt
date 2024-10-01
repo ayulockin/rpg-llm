@@ -1,0 +1,9 @@
+LICENSE
+README.md
+pyproject.toml
+rpg_agent/__init__.py
+rpg_agent.egg-info/PKG-INFO
+rpg_agent.egg-info/SOURCES.txt
+rpg_agent.egg-info/dependency_links.txt
+rpg_agent.egg-info/requires.txt
+rpg_agent.egg-info/top_level.txt

@@ -1,0 +1,22 @@
+[project]
+name = "rpg_agent"
+version = "0.0.1"
+description = "An agent that helps you play Divinity Original Sin II."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "instructor>=1.4.1",
+    "openai>=1.50.2",
+    "pip>=24.2",
+    "python-dotenv>=1.0.1",
+    "weave>=0.51.12",
+    "uv>=0.4.17",
+    "black>=24.8.0",
+    "isort>=5.13.2",
+    "pytest>=8.3.3",
+    "ruff>=0.6.8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = ["tests"]
