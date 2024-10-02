@@ -5,11 +5,7 @@ import pyautogui
 import pywinctl
 from pynput.mouse import Button, Controller
 from pywinctl._pywinctl_macos import MacOSWindow
-from Quartz.CoreGraphics import (
-    CGEventCreateKeyboardEvent,
-    CGEventPost,
-    kCGHIDEventTap,
-)
+from Quartz.CoreGraphics import CGEventCreateKeyboardEvent, CGEventPost, kCGHIDEventTap
 
 
 class KeyStroke(Enum):
@@ -38,8 +34,13 @@ def press_key(key_code):
 
 class InputeExecutor:
 
-    def __init__(self, game_window_title: str = "DOS II"):
+    def __init__(
+        self,
+        game_window_title: str = "DOS II",
+        game_window_size: tuple[int, int] = (2560, 1440),
+    ):
         self.game_window_title = game_window_title
+        self.game_window_size = game_window_size
         self.mouse_controller = Controller()
         self.game_window = self.focus_game_window()
 
@@ -76,11 +77,15 @@ class InputeExecutor:
         if self.game_window:
             if mouse_action == MouseAction.mouse_left:
                 if x and y:
+                    y -= self.game_window_size[1]
                     pyautogui.moveTo(x, y)
+                print("HERE")
                 self.mouse_controller.click(Button.left)
             elif mouse_action == MouseAction.mouse_right:
                 if x and y:
+                    y -= self.game_window_size[1]
                     pyautogui.moveTo(x, y)
                 self.mouse_controller.click(Button.right)
             elif mouse_action == MouseAction.move:
+                y -= self.game_window_size[1]
                 pyautogui.moveTo(x, y)
