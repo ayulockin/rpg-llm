@@ -1,18 +1,14 @@
 from enum import Enum
-from typing import Union
+from typing import Optional, Union
 
+import pyautogui
 import pywinctl
+from pynput.mouse import Button, Controller
 from pywinctl._pywinctl_macos import MacOSWindow
 from Quartz.CoreGraphics import (
     CGEventCreateKeyboardEvent,
-    CGEventCreateMouseEvent,
     CGEventPost,
-    kCGEventLeftMouseDown,
-    kCGEventLeftMouseUp,
-    kCGEventMouseMoved,
     kCGHIDEventTap,
-    kCGMouseButtonLeft,
-    kCGMouseButtonRight,
 )
 
 
@@ -40,49 +36,11 @@ def press_key(key_code):
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, False))
 
 
-def move_mouse(x: int, y: int):
-    CGEventPost(
-        kCGHIDEventTap,
-        CGEventCreateMouseEvent(None, kCGEventMouseMoved, (x, y), kCGMouseButtonLeft),
-    )
-
-
-def mouse_left_click(x: int, y: int):
-    move_mouse(x, y)
-    # Simulate left mouse button down
-    CGEventPost(
-        kCGHIDEventTap,
-        CGEventCreateMouseEvent(
-            None, kCGEventLeftMouseDown, (x, y), kCGMouseButtonLeft
-        ),
-    )
-    # Simulate left mouse button up
-    CGEventPost(
-        kCGHIDEventTap,
-        CGEventCreateMouseEvent(None, kCGEventLeftMouseUp, (x, y), kCGMouseButtonLeft),
-    )
-
-
-def mouse_right_click(x: int, y: int):
-    move_mouse(x, y)
-    # Simulate left mouse button down
-    CGEventPost(
-        kCGHIDEventTap,
-        CGEventCreateMouseEvent(
-            None, kCGEventLeftMouseDown, (x, y), kCGMouseButtonRight
-        ),
-    )
-    # Simulate left mouse button up
-    CGEventPost(
-        kCGHIDEventTap,
-        CGEventCreateMouseEvent(None, kCGEventLeftMouseUp, (x, y), kCGMouseButtonRight),
-    )
-
-
 class InputeExecutor:
 
     def __init__(self, game_window_title: str = "DOS II"):
         self.game_window_title = game_window_title
+        self.mouse_controller = Controller()
         self.game_window = self.focus_game_window()
 
     def focus_game_window(self) -> Union[MacOSWindow, None]:
@@ -109,11 +67,20 @@ class InputeExecutor:
         if self.game_window:
             press_key(keystroke.value)
 
-    def execute_mouse_action(self, mouse_action: MouseAction, x: int, y: int) -> None:
+    def execute_mouse_action(
+        self,
+        mouse_action: MouseAction,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+    ) -> None:
         if self.game_window:
             if mouse_action == MouseAction.mouse_left:
-                mouse_left_click(x, y)
+                if x and y:
+                    pyautogui.moveTo(x, y)
+                self.mouse_controller.click(Button.left)
             elif mouse_action == MouseAction.mouse_right:
-                mouse_right_click(x, y)
+                if x and y:
+                    pyautogui.moveTo(x, y)
+                self.mouse_controller.click(Button.right)
             elif mouse_action == MouseAction.move:
-                move_mouse(x, y)
+                pyautogui.moveTo(x, y)
