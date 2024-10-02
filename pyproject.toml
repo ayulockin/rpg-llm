@@ -5,10 +5,15 @@ description = "An agent that helps you play Divinity Original Sin II."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "anthropic>=0.34.2",
     "instructor>=1.4.1",
+    "mistralai>=1.1.0",
     "openai>=1.50.2",
     "pip>=24.2",
+    "pillow>=10.4.0",
+    "pyobjc-framework-Quartz>=10.3.1",
     "python-dotenv>=1.0.1",
+    "PyWinCtl>=0.4.1",
     "weave>=0.51.12",
     "uv>=0.4.17",
     "black>=24.8.0",
