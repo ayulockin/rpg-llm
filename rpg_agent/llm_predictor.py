@@ -71,11 +71,25 @@ class LLMPredictor(weave.Model):
                     messages=self.frame_messages(system_prompt, user_prompts),
                     **kwargs,
                 )
+            elif "response_format" in kwargs:
+                return (
+                    self._llm_client.beta.chat.completions.create(
+                        model=self.model_name,
+                        messages=self.frame_messages(system_prompt, user_prompts),
+                        **kwargs,
+                    )
+                    .choices[0]
+                    .message.parsed
+                )
             else:
-                return self._llm_client.chat.completions.create(
-                    model=self.model_name,
-                    messages=self.frame_messages(system_prompt, user_prompts),
-                    **kwargs,
+                return (
+                    self._llm_client.chat.completions.create(
+                        model=self.model_name,
+                        messages=self.frame_messages(system_prompt, user_prompts),
+                        **kwargs,
+                    )
+                    .choices[0]
+                    .message.content
                 )
         else:
             raise ValueError(f"Invalid LLM client: {self.llm_client}")
