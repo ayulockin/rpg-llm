@@ -39,8 +39,16 @@ class CharacterElementalStats(BaseModel):
     poison: int
 
 
-class StatsCataloguer(weave.Model):
-    frame_predictor: LLMPredictor
-    
-    
-    
+class CharacterHealthStats(BaseModel):
+    vitality_total: int
+    vitality_current: int
+    action_points: int
+    source_points: int
+
+
+class CharacterAttributes(BaseModel):
+    base_stats: CharacterBaseStats
+    combat_stats: CharacterCombatStats
+    action_stats: CharacterActionStats
+    elemental_stats: CharacterElementalStats
+    health_stats: CharacterHealthStats
