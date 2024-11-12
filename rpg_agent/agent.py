@@ -2,6 +2,7 @@ import weave
 import json
 import cv2
 import numpy as np
+import random
 from PIL import ImageGrab, Image
 
 from .llm_predictor import LLMPredictor
@@ -16,9 +17,13 @@ def get_game_window():
 class ScreenshotDescriptionAgent(weave.Model):
     frame_predictor: LLMPredictor
     prompt: str = """
-    We are playing Divinity: Original Sin 2 game. You are provided the current frame of the game. The character in the center of the screen is the player. 
+    We are playing Divinity: Original Sin 2 game. You are provided the current frame of the game. The player or character is likely in the center of the screen. 
     
-    We are trying to play this game autonomously thus we need to know what the current state of the game is. Your task is to describe the frame in great detail. Use bullet points and be very specific. Tell the count of the object of interest where necessary and the position of it with respect to the player.
+    We are trying to play this game autonomously thus we need to know what the current state of the game is. Your task is to describe the frame in great detail. Use bullet points and be very specific.
+    
+    - Tell the count of the objects of interest if there are multiple objects of the same type where necessary.
+    - Describe the position of the objects of interest with respect to the player or character.
+    - Also describe how far the object of interest is from the player or character.
     """.strip()
 
     @weave.op()
@@ -36,41 +41,39 @@ class ScreenshotDescriptionAgent(weave.Model):
 
 class ObjectDetectionAgent(weave.Model):
     object_detector: LLMPredictor  # it can also be a standard object detection model
-    prompt_task: str = """We need to detect the objects of interest in the frame of the game. We are playing Divinity: Original Sin 2. Please carefully examine the frame and detect objects of interest with precise bounding boxes that closely enclose each object. 
 
-    The frame is 1920x1080 (width, height) with the main character centered in the screen, highlighted in blue. The bounding boxes should be non-normalized (pixel values) and match the actual size and position of each detected object as accurately as possible.
+    prompt_task: str = """We need to detect the points of interest in the frame of the game. We are playing Divinity: Original Sin 2. Please carefully examine the frame and predict the likely positions of objects of interest in the frame.
 
-    Other than the image itself, we are also providing the description of the frame to help you detect the objects better.
+    The frame is 1920x1080 (width, height) with the main character centered in the screen, highlighted in blue. Each object should be represented by multiple points in (x, y) pixel coordinates that indicate the approximate center or important points of the object.
+
+    Other than the image itself, we are also providing the description of the frame to help you know the objects of interests.
 
     Frame description: {frame_description}
     """.strip()
 
     prompt_instructions: str = """
-    Return ONLY a JSON object containing the bounding boxes. 
+    Return ONLY a JSON object containing the object points.
         
     Follow these strict rules:
     1. Output MUST be valid JSON with no additional text
     2. Each detected object must have:
         - 'element': descriptive name of the object
-        - 'bbox': [x1, y1, x2, y2] coordinates (non-normalized pixel values) in the (x_min, y_min, x_max, y_max) format.
-        - 'confidence': confidence score (0-1)
+        - 'points': list of (x, y) coordinates in pixel values for each point of interest within the object.
     3. Use this exact format:
         {
             "objects": [
                 {
                     "element": "object_name1",
-                    "bbox": [x_min, y_min, x_max, y_max],
-                    "confidence": 0.95
+                    "points": [[x1, y1], [x2, y2], ...],
                 },
                 {
                     "element": "object_name2",
-                    "bbox": [x_min, y_min, x_max, y_max],
-                    "confidence": 0.95
-                },
+                    "points": [[x1, y1], [x2, y2], ...],
+                }
             ]
         }
-    4. Coordinates must be precise and properly normalized
-    5. DO NOT include any explanation or additional text
+    4. Points should be precise and accurately represent the locations of each object.
+    5. DO NOT include any explanation or additional text.
     """.strip()
 
     def parse_json(self, text: str) -> dict:
@@ -90,36 +93,48 @@ class ObjectDetectionAgent(weave.Model):
         json_str = match.group(1).strip()
         return json.loads(json_str)
     
-    
-    def draw_bboxes(self, image, bboxes, image_size=(1920, 1080)):
+    def draw_points(self, image, points_data, image_size=(1920, 1080)):
         # Convert the image from PIL to OpenCV format
         open_cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-        # Convert normalized bbox coordinates to absolute pixel values and draw bounding boxes
-        width, height = image_size
-        for item in bboxes:
+        # Define colors for each unique object
+        color_map = {}
+        # Generate random colors for variety
+        def random_color():
+            return (
+                random.randint(0, 255),  # B
+                random.randint(0, 255),  # G 
+                random.randint(0, 255)   # R
+            )
+
+        # Draw points for each object
+        for item in points_data:
             element = item["element"]
-            bbox = item["bbox"]
-            confidence = item["confidence"]
+            points = item["points"]
 
-            x_min, y_min = int(bbox[0]), int(bbox[1])
-            x_max, y_max = int(bbox[2]), int(bbox[3])
+            # Assign a color to each unique object type
+            if element not in color_map:
+                color_map[element] = random_color()
 
-            # Draw rectangle and label
-            color = (0, 255, 0)  # Green color for bounding box
-            cv2.rectangle(open_cv_image, (x_min, y_min), (x_max, y_max), color, 2)
-            label = f"{element} ({confidence:.2f})"
-            cv2.putText(open_cv_image, label, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            color = color_map[element]
+            
+            for point in points:
+                x, y = int(point[0]), int(point[1])
+                
+                # Draw the point on the image
+                cv2.circle(open_cv_image, (x, y), 5, color, -1)
+            
+            # Add label with the element name and confidence near the first point of each object
+            label = f"{element}"
+            cv2.putText(open_cv_image, label, (int(points[0][0]), int(points[0][1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
         # Convert the image back from OpenCV format (BGR) to PIL format (RGB)
         result_image = Image.fromarray(cv2.cvtColor(open_cv_image, cv2.COLOR_BGR2RGB))
         return result_image
-        
 
     @weave.op()
     def predict(self, frame_description: str):
         image = get_game_window()
-
 
         system_prompt = self.prompt_task.format(frame_description=frame_description)
         system_prompt += "\n" + self.prompt_instructions
@@ -137,10 +152,10 @@ class ObjectDetectionAgent(weave.Model):
         }
 
         try:
-            bboxes = self.parse_json(output["prediction"])
-            print(bboxes)
-            output["bboxes"] = self.draw_bboxes(image, bboxes["objects"])
+            points_data = self.parse_json(output["prediction"])
+            print(points_data)
+            output["points_image"] = self.draw_points(image, points_data["objects"])
         except json.JSONDecodeError:
-            pass
-
+            print("Error decoding JSON from response")
+        
         return output
