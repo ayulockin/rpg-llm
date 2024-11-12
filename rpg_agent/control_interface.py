@@ -17,6 +17,11 @@ class KeyStroke(Enum):
     control = 0x3B
     option = 0x3A
     tab = 0x30
+    i = 0x22  # open and close inventory
+    f = 0x03  # cycle through powers
+    g = 0x05  # open and close crafting panel
+    k = 0x28  # open and close skill panel
+    l = 0x25  # open log
 
 
 class MouseAction(Enum):
@@ -26,13 +31,11 @@ class MouseAction(Enum):
 
 
 def press_key(key_code):
-    # Create and post key down event
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, True))
-    # Create and post key up event
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, False))
 
 
-class InputeExecutor:
+class InputExecutor:
 
     def __init__(
         self,
@@ -74,18 +77,17 @@ class InputeExecutor:
         x: Optional[int] = None,
         y: Optional[int] = None,
     ) -> None:
-        if self.game_window:
+        if self.game_window and self.game_window.isActive:
             if mouse_action == MouseAction.mouse_left:
-                if x and y:
-                    y -= self.game_window_size[1]
+                if x is not None and y is not None:
                     pyautogui.moveTo(x, y)
-                print("HERE")
-                self.mouse_controller.click(Button.left)
+                pyautogui.click(button='left')
             elif mouse_action == MouseAction.mouse_right:
-                if x and y:
-                    y -= self.game_window_size[1]
+                if x is not None and y is not None:
                     pyautogui.moveTo(x, y)
-                self.mouse_controller.click(Button.right)
+                pyautogui.click(button='right')
             elif mouse_action == MouseAction.move:
-                y -= self.game_window_size[1]
-                pyautogui.moveTo(x, y)
+                if x is not None and y is not None:
+                    pyautogui.moveTo(x, y)
+        else:
+            print("Game window is not active. Unable to perform mouse action.")
