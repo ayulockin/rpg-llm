@@ -8,6 +8,7 @@ dependencies = [
     "anthropic>=0.34.2",
     "instructor>=1.4.1",
     "mistralai>=1.1.0",
+    "mss>=9.0.2",
     "openai>=1.50.2",
     "pip>=24.2",
     "pillow>=10.4.0",

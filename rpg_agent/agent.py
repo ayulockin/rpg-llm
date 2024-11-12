@@ -1,11 +1,13 @@
+import mss
 import weave
-from PIL import ImageGrab
+from PIL import Image
 
 from .llm_predictor import LLMPredictor
 
 
 class ScreenshotDescriptionAgent(weave.Model):
     frame_predictor: LLMPredictor
+    monitor_index: int = 2
     prompt: str = """
     We are playing Divinity: Original Sin 2 game. You are provided the current frame of the game. The character in the center of the screen is the player. 
     
@@ -14,7 +16,12 @@ class ScreenshotDescriptionAgent(weave.Model):
 
     @weave.op()
     def get_game_window(self):
-        return ImageGrab.grab() # defaults to whole window capture
+        with mss.mss() as sct:
+            monitors = sct.monitors
+            extended_display = monitors[self.monitor_index]
+            screenshot = sct.grab(extended_display)
+            img = Image.frombytes('RGB', screenshot.size, screenshot.bgra, 'raw', 'BGRX')
+        return img
 
     @weave.op()
     def predict(self):
@@ -25,4 +32,3 @@ class ScreenshotDescriptionAgent(weave.Model):
                 user_prompts=[self.get_game_window()],
             ),
         }
-
