@@ -2,3 +2,5 @@ __pycache__/
 test.py
 .env
 rpg_agent.egg-info/
+
+detected_changes/
