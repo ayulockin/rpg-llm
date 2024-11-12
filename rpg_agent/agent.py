@@ -10,9 +10,7 @@ class DivinityAgent(weave.Model):
 
     @weave.op()
     def get_game_window(self):
-        return ImageGrab.grab(
-            bbox=(0, -self.game_window_size[1], self.game_window_size[0], 0)
-        )
+        return ImageGrab.grab()
 
     @weave.op()
     def predict(self):
