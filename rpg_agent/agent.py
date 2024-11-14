@@ -75,17 +75,14 @@ You are to extract the following information from the screenshot:
     @weave.op()
     def predict(self, sleep_time_between_actions: int = 2):
         executor = InputExecutor()
-        # executor.execute_keystroke(KeyStroke.i)
-        # sleep(sleep_time_between_actions)
-        # screenshot = self.get_game_window()
-        # sleep(sleep_time_between_actions)
-        # executor.execute_keystroke(KeyStroke.i)
+        executor.execute_keystroke(KeyStroke.i)
+        sleep(sleep_time_between_actions)
+        screenshot = self.get_game_window()
+        sleep(sleep_time_between_actions)
+        executor.execute_keystroke(KeyStroke.i)
 
-        # left_half_image = self.crop_left_half(screenshot)
+        left_half_image = self.crop_left_half(screenshot)
 
-        # character_attributes = self.get_character_attributes(left_half_image)
+        character_attributes = self.get_character_attributes(left_half_image)
 
-        # return character_attributes
-        executor.execute_mouse_action(
-            mouse_action=MouseAction.move, x=2560 // 2, y=1440 // 2
-        )
+        return character_attributes
