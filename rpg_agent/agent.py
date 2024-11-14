@@ -15,9 +15,7 @@ from .tools import inventory_agent_tools
 from .control_interface import (
     KeyStroke, KEYSTROKE_STRING_MAPPING, InputExecutor
 )
-from .utils import (
-    encode_image, save_combined_image, get_game_window
-)
+from .utils import *
 
 
 class ScreenshotDescriptionAgent(weave.Model):
@@ -51,7 +49,7 @@ class ScreenshotDescriptionAgent(weave.Model):
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": encode_image(image)
+                                "url": encode_image(image) # utils.py
                             }
                         }
                     ]
@@ -88,49 +86,8 @@ class WhereIsTheCharacterAgent(weave.Model):
     """.strip()
 
     @weave.op()
-    def parse_json(self, text: str) -> dict:
-        """
-        Parse JSON from text that starts with ```json and ends with ```
-        """
-        import re
-        
-        # Use regex to extract JSON content between ```json and ``` markers
-        pattern = r"```json(.*?)```"
-        match = re.search(pattern, text, re.DOTALL)
-        
-        if not match:
-            return json.loads(text)
-    
-        # Extract and parse the JSON content
-        json_str = match.group(1).strip()
-        return json.loads(json_str)
-    
-    
-    def draw_bbox(self, image, bbox_data, image_size=(1920, 1080)):
-        # Convert the image from PIL to OpenCV format
-        open_cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-
-        # Draw bounding box
-        element = bbox_data["element"]
-        bbox = bbox_data["bbox"]
-        confidence = bbox_data["confidence"]
-
-        x_min, y_min = int(bbox[0]), int(bbox[1])
-        x_max, y_max = int(bbox[2]), int(bbox[3])
-
-        # Draw rectangle and label
-        color = (0, 255, 0)  # Green color for bounding box
-        cv2.rectangle(open_cv_image, (x_min, y_min), (x_max, y_max), color, 2)
-        label = f"{element} ({confidence:.2f})"
-        cv2.putText(open_cv_image, label, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-        # Convert the image back from OpenCV format (BGR) to PIL format (RGB)
-        result_image = Image.fromarray(cv2.cvtColor(open_cv_image, cv2.COLOR_BGR2RGB))
-        return result_image
-
-    @weave.op()
     def predict(self, frame_description: str):
-        image = get_game_window()
+        image = get_game_window() # utils.py
 
         system_prompt = self.prompt_task.format(frame_description=frame_description)
         system_prompt += "\n" + self.prompt_instructions
@@ -143,11 +100,11 @@ class WhereIsTheCharacterAgent(weave.Model):
         )
 
         try:
-            bboxes = self.parse_json(response.choices[0].message.content)
+            bboxes = parse_json(response.choices[0].message.content)
             print(bboxes)
             output = {
                 "game_frame": image,
-                "prediction_image": self.draw_bbox(image, bboxes),
+                "prediction_image": draw_bbox(image, bboxes),  # utils.py
                 "prediction": bboxes,
             }        
         except json.JSONDecodeError:
@@ -296,3 +253,28 @@ class InventoryAgent(weave.Model):
                 break
 
         return inventory_description, self.chat_history
+
+
+"""
+storage agent is responsible for picking the items from the storage units and putting them in the inventory.
+
+1. get the coordinates for the storage unit.
+2. click on the storage unit.
+3. if the storage unit is open, use the `llm_frame_description` function to get the description of the storage unit. like how many items are there, what are the items.
+4. click on the take all button.
+5. click on the close button.
+6. repeat the process for the next storage unit.
+"""
+
+
+class StorageAgent(weave.Model):
+    name: str = "storage_agent"
+    llm: LLMPredictor = LLMPredictor(model_name="gpt-4o")
+    frame_prompt: str = """
+    You are playing Divinity: Original Sin 2. You are given the frame of the game with the storage unit opened. Please describe the contents of the storage unit in great detail. The storag unit will have a checkboard pattern where each cell will have an item. Tell me the total count of the items and the count of each item.
+    """.strip()
+    frame_description: ScreenshotDescriptionAgent = ScreenshotDescriptionAgent(prompt=frame_prompt)
+
+    @weave.op()
+    def predict(self):
+        pass

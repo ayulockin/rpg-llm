@@ -10,6 +10,7 @@ from rpg_agent.agent import (
     HoverDetectionAgent,
     PlannerAgent,
     InventoryAgent,
+    StorageAgent,
 )
 from rpg_agent.llm_predictor import LLMPredictor
 from rpg_agent.control_interface import InputExecutor, KeyStroke, MouseAction
@@ -85,15 +86,12 @@ class GameAgent(weave.Model):
                 executor.execute_mouse_action(**args_dict)
 
 
-# game_agent = GameAgent()
-# game_agent.run()
+# inventory_agent = InventoryAgent()
+# inventory_agent.predict(
+#     executor=executor,
+#     llm_frame_description=llm_frame_description
+# )
 
 
-inventory_agent = InventoryAgent()
-inventory_agent.predict(
-    executor=executor,
-    llm_frame_description=llm_frame_description
-)
-
-# executor.execute_keystroke(KeyStroke.i)
-
+storage_agent = StorageAgent()
+storage_agent.predict()
