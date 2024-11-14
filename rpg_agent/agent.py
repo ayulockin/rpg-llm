@@ -11,16 +11,17 @@ import os
 from openai.types.chat.chat_completion_message_tool_call import Function
 
 from .llm_predictor import LLMPredictor
-from .utils import encode_image
-
-
-def get_game_window():
-    """Get the current game window.
-    """
-    return ImageGrab.grab() # defaults to whole window capture
+from .tools import inventory_agent_tools
+from .control_interface import (
+    KeyStroke, KEYSTROKE_STRING_MAPPING, InputExecutor
+)
+from .utils import (
+    encode_image, save_combined_image, get_game_window
+)
 
 
 class ScreenshotDescriptionAgent(weave.Model):
+    name: str = "screenshot_description_agent"
     llm: LLMPredictor = LLMPredictor(
         model_name="gpt-4o-mini",
     )
@@ -158,32 +159,6 @@ class WhereIsTheCharacterAgent(weave.Model):
         return output
 
 
-@weave.op()
-def save_combined_image(before_img, after_img, x, y, count, save_dir):
-    """Save concatenated before and after images with coordinates annotation."""
-    # Convert OpenCV images to PIL format for combining
-    before_pil = Image.fromarray(cv2.cvtColor(before_img, cv2.COLOR_BGR2RGB))
-    after_pil = Image.fromarray(cv2.cvtColor(after_img, cv2.COLOR_BGR2RGB))
-
-    # Concatenate images side by side
-    combined_image = Image.new('RGB', (before_pil.width + after_pil.width, before_pil.height))
-    combined_image.paste(before_pil, (0, 0))
-    combined_image.paste(after_pil, (before_pil.width, 0))
-
-    # Annotate the image with coordinates
-    draw = ImageDraw.Draw(combined_image)
-    annotation_text = f"Change detected at ({x}, {y})"
-    draw.text((10, 10), annotation_text, fill="red")
-
-    # Save the combined image
-    filename = f"{save_dir}/detection_{count}_{x}_{y}.png"
-    os.makedirs(save_dir, exist_ok=True)
-    combined_image.save(filename)
-    print(f"Saved detection image: {filename}")
-
-    return combined_image
-
-
 class HoverDetectionAgent(weave.Model):
     save_dir: str = "detected_changes"
     crop_size: int = 80
@@ -265,3 +240,59 @@ class PlannerAgent(weave.Model):
         )
 
 
+class InventoryAgent(weave.Model):
+    name: str = "inventory_agent"
+    llm: LLMPredictor = LLMPredictor(model_name="gpt-4o")
+
+    agent_instruction: str = """
+    You are responsible for opening the inventory and describing the contents. You have to do the following in order. STRICTLY follow the order.
+
+    1. For opening the inventory, use the key 'i'. You have access to the `execute_keystroke` method. Once the inventory is open, you can describe the contents.
+
+    2. For describing the inventory, use the `llm_frame_description` function. This function takes in no arguments. Once you have the description, you can close the inventory.
+
+    3. For closing the inventory, use the key 'i' again. You have access to the `execute_keystroke` method
+
+    4. Once this task is complete, you should return JUST a valid boolean value: False.
+    """
+    tools: list[dict] = inventory_agent_tools
+    chat_history: list[str] = [
+        {"role": "system", "content": agent_instruction}
+    ]
+
+    @weave.op()
+    def predict(
+        self,
+        executor: InputExecutor,
+        llm_frame_description: ScreenshotDescriptionAgent
+    ):
+        while True:
+            response = self.llm.predict(
+                messages=self.chat_history,
+                tools=self.tools,
+            )
+            print(response)
+
+            if response.choices[0].message.tool_calls:
+                for tool_call in response.choices[0].message.tool_calls:
+                    print(tool_call)
+                if tool_call.function.arguments:
+                    arguments = json.loads(tool_call.function.arguments)
+
+                if tool_call.function.name == "execute_keystroke":
+                    executor.execute_keystroke(
+                        KeyStroke(KEYSTROKE_STRING_MAPPING[arguments["keystroke"]])
+                    )
+                    self.chat_history.append(
+                        {"role": "assistant", "content": "Pressed key: " + arguments["keystroke"]}
+                    )
+                elif tool_call.function.name == "llm_frame_description":
+                    inventory_description = llm_frame_description.predict()
+                    self.chat_history.append(
+                        {"role": "assistant", "content": "We gathered the description of the inventory."}
+                    )
+            
+            if response.choices[0].message.content == "False":
+                break
+
+        return inventory_description, self.chat_history

@@ -41,8 +41,6 @@ KEYSTROKE_STRING_MAPPING = {
 }
 
 
-
-
 class MouseAction(Enum):
     mouse_left = "mouse_left"
     mouse_right = "mouse_right"

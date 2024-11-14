@@ -9,9 +9,10 @@ from rpg_agent.agent import (
     WhereIsTheCharacterAgent,
     HoverDetectionAgent,
     PlannerAgent,
+    InventoryAgent,
 )
 from rpg_agent.llm_predictor import LLMPredictor
-from rpg_agent.control_interface import InputExecutor, KeyStroke, MouseAction, KEYSTROKE_STRING_MAPPING
+from rpg_agent.control_interface import InputExecutor, KeyStroke, MouseAction
 from rpg_agent.utils import get_bbox_center
 from openai.types.chat.chat_completion_message_tool_call import Function
 
@@ -88,99 +89,11 @@ class GameAgent(weave.Model):
 # game_agent.run()
 
 
-"""
-1. Press i
-2. Grab screen
-3. Describe screen
-4. Prss i
-"""
-
-inventory_agent_tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "llm_frame_description",
-            "description": "Call this whenever you need to know the current frame of the game. This function takes in no arguments.",
-            "parameters": {},
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "execute_keystroke",
-            "description": "Call this whenever you need to press a key. This function takes in a `KeyStroke` enum.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "keystroke": {
-                        "type": "string",
-                        "enum": list(KEYSTROKE_STRING_MAPPING.keys()),
-                    }
-                },
-                "required": ["keystroke"],
-            },
-        },
-    },
-]
-
-
-
-class InventoryAgent(weave.Model):
-    llm: LLMPredictor = LLMPredictor(model_name="gpt-4o")
-
-    agent_instruction: str = """
-    You are responsible for opening the inventory and describing the contents. You have to do the following in order. STRICTLY follow the order.
-
-    1. For opening the inventory, use the key 'i'. You have access to the `execute_keystroke` method. Once the inventory is open, you can describe the contents.
-
-    2. For describing the inventory, use the `llm_frame_description` function. This function takes in no arguments. Once you have the description, you can close the inventory.
-
-    3. For closing the inventory, use the key 'i' again. You have access to the `execute_keystroke` method
-
-    4. Once this task is complete, you should return JUST a valid boolean value: False.
-    """
-    tools: list[dict] = inventory_agent_tools
-    chat_history: list[str] = [
-        {"role": "system", "content": agent_instruction}
-    ]
-
-    @weave.op()
-    def predict(self):
-
-        while True:
-            response = self.llm.predict(
-                messages=self.chat_history,
-                tools=self.tools,
-            )
-            print(response)
-
-            if response.choices[0].message.tool_calls:
-                for tool_call in response.choices[0].message.tool_calls:
-                    print(tool_call)
-                if tool_call.function.arguments:
-                    arguments = json.loads(tool_call.function.arguments)
-
-                if tool_call.function.name == "execute_keystroke":
-                    executor.execute_keystroke(
-                        KeyStroke(KEYSTROKE_STRING_MAPPING[arguments["keystroke"]])
-                    )
-                    self.chat_history.append(
-                        {"role": "assistant", "content": "Pressed key: " + arguments["keystroke"]}
-                    )
-                elif tool_call.function.name == "llm_frame_description":
-                    inventory_description = llm_frame_description.predict()
-                    self.chat_history.append(
-                        {"role": "assistant", "content": "We gathered the description of the inventory."}
-                    )
-            
-            if response.choices[0].message.content == "False":
-                break
-
-        return inventory_description
-
-
 inventory_agent = InventoryAgent()
-inventory_agent.predict()
+inventory_agent.predict(
+    executor=executor,
+    llm_frame_description=llm_frame_description
+)
 
 # executor.execute_keystroke(KeyStroke.i)
 
