@@ -24,6 +24,25 @@ class KeyStroke(Enum):
     l = 0x25  # open log
 
 
+KEYSTROKE_STRING_MAPPING = {
+    "enter": KeyStroke.enter,
+    "command": KeyStroke.command,
+    "escape": KeyStroke.escape,
+    "shift": KeyStroke.shift,
+    "space": KeyStroke.space,
+    "control": KeyStroke.control,
+    "option": KeyStroke.option,
+    "tab": KeyStroke.tab,
+    "i": KeyStroke.i,
+    "f": KeyStroke.f,
+    "g": KeyStroke.g,
+    "k": KeyStroke.k,
+    "l": KeyStroke.l,
+}
+
+
+
+
 class MouseAction(Enum):
     mouse_left = "mouse_left"
     mouse_right = "mouse_right"

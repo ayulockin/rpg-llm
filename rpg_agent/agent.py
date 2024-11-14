@@ -8,7 +8,10 @@ import pyautogui
 import time
 import os
 
+from openai.types.chat.chat_completion_message_tool_call import Function
+
 from .llm_predictor import LLMPredictor
+from .utils import encode_image
 
 
 def get_game_window():
@@ -18,7 +21,9 @@ def get_game_window():
 
 
 class ScreenshotDescriptionAgent(weave.Model):
-    frame_predictor: LLMPredictor
+    llm: LLMPredictor = LLMPredictor(
+        model_name="gpt-4o-mini",
+    )
     prompt: str = """
     We are playing Divinity: Original Sin 2 game. You are provided the current frame of the game. The player or character is likely in the center of the screen. 
     
@@ -31,13 +36,30 @@ class ScreenshotDescriptionAgent(weave.Model):
 
     @weave.op()
     def predict(self):
-        response = self.frame_predictor.predict(
-            system_prompt=self.prompt,
-            user_prompts=[get_game_window()],
+        image = get_game_window()
+
+        response = self.llm.predict(
+            messages=[
+                {
+                    "role": "system", 
+                    "content": self.prompt
+                },
+                {
+                    "role": "user", 
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": encode_image(image)
+                            }
+                        }
+                    ]
+                },
+            ],
         )
 
         return {
-            "game_frame": get_game_window(),
+            "game_frame": image,
             "prediction": response.choices[0].message.content,
         }
 
@@ -231,3 +253,15 @@ class HoverDetectionAgent(weave.Model):
                 previous_frame = current_frame
 
         return detected_points
+
+
+class PlannerAgent(weave.Model):
+    @weave.op()
+    def predict(self):
+        # will return the tool name
+        return Function(
+            name="execute_mouse_action",
+            arguments="mouse_action=MouseAction.mouse_left, x=1100, y=600",
+        )
+
+
