@@ -1,11 +1,17 @@
+import json
+
 import mss
 import weave
-from PIL import Image
+from PIL import Image, ImageDraw
 from time import sleep
 
 from rpg_agent.llm_predictor import LLMPredictor
-from rpg_agent.control_interface import InputExecutor, KeyStroke
-from rpg_agent.game_state.stats_catalogue import CharacterAttributes
+from rpg_agent.control_interface import InputExecutor, KeyStroke, MouseAction
+from rpg_agent.game_state.stats_catalogue import (
+    CharacterAttributes,
+    CharacterEquipmentCoordinates,
+    Coordinates,
+)
 
 
 class BaseAgent(weave.Model):
@@ -49,10 +55,7 @@ class StatsCatalogueAgent(BaseAgent):
         return left_half_image
 
     @weave.op()
-    def predict(self):
-        InputExecutor().execute_keystroke(KeyStroke.i)
-        sleep(5)
-        left_half_image = self.crop_left_half(self.get_game_window())
+    def get_character_attributes(self, left_half_image: Image.Image):
         return self.frame_predictor.predict(
             system_prompt="""
 You are provided with a screenshot from a role playing game that shows the attributes of a character.
@@ -67,4 +70,22 @@ You are to extract the following information from the screenshot:
         """,
             user_prompts=[left_half_image],
             response_model=CharacterAttributes,
+        )
+
+    @weave.op()
+    def predict(self, sleep_time_between_actions: int = 2):
+        executor = InputExecutor()
+        # executor.execute_keystroke(KeyStroke.i)
+        # sleep(sleep_time_between_actions)
+        # screenshot = self.get_game_window()
+        # sleep(sleep_time_between_actions)
+        # executor.execute_keystroke(KeyStroke.i)
+
+        # left_half_image = self.crop_left_half(screenshot)
+
+        # character_attributes = self.get_character_attributes(left_half_image)
+
+        # return character_attributes
+        executor.execute_mouse_action(
+            mouse_action=MouseAction.move, x=2560 // 2, y=1440 // 2
         )

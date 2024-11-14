@@ -2,3 +2,4 @@ __pycache__/
 test.py
 .env
 rpg_agent.egg-info/
+uv.lock

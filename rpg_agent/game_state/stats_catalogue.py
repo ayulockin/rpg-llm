@@ -52,3 +52,12 @@ class CharacterAttributes(BaseModel):
     action_stats: CharacterActionStats
     elemental_stats: CharacterElementalStats
     health_stats: CharacterHealthStats
+
+
+class Coordinates(BaseModel):
+    x: float
+    y: float
+
+
+class CharacterEquipmentCoordinates(BaseModel):
+    coordinates: list[Coordinates]

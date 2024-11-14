@@ -10,6 +10,7 @@ dependencies = [
     "mistralai>=1.2.1",
     "mss>=9.0.2",
     "openai>=1.54.3",
+    "opencv-python>=4.10.0.84",
     "pip>=24.2",
     "pillow>=10.4.0",
     "PyAutoGUI>=0.9.54",

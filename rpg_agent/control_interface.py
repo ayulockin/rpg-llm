@@ -3,6 +3,7 @@ from typing import Optional, Union
 
 import pyautogui
 import pywinctl
+from pydantic import BaseModel
 from pynput.mouse import Button, Controller
 from pywinctl._pywinctl_macos import MacOSWindow
 from Quartz.CoreGraphics import CGEventCreateKeyboardEvent, CGEventPost, kCGHIDEventTap
@@ -31,21 +32,28 @@ class MouseAction(Enum):
 
 
 def press_key(key_code):
+    # Create and post key down event
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, True))
+    # Create and post key up event
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, False))
 
 
-class InputExecutor:
+class InputExecutor(BaseModel):
+    game_window_title: str
+    game_window_size: tuple[int, int]
+    _mouse_controller: Controller
+    _game_window: Optional[Union[MacOSWindow, None]]
 
     def __init__(
         self,
         game_window_title: str = "DOS II",
         game_window_size: tuple[int, int] = (2560, 1440),
     ):
-        self.game_window_title = game_window_title
-        self.game_window_size = game_window_size
-        self.mouse_controller = Controller()
-        self.game_window = self.focus_game_window()
+        super().__init__(
+            game_window_title=game_window_title, game_window_size=game_window_size
+        )
+        self._mouse_controller = Controller()
+        self._game_window = self.focus_game_window()
 
     def focus_game_window(self) -> Union[MacOSWindow, None]:
         try:
@@ -68,7 +76,7 @@ class InputExecutor:
             return None
 
     def execute_keystroke(self, keystroke: KeyStroke) -> None:
-        if self.game_window:
+        if self._game_window:
             press_key(keystroke.value)
 
     def execute_mouse_action(
@@ -77,17 +85,17 @@ class InputExecutor:
         x: Optional[int] = None,
         y: Optional[int] = None,
     ) -> None:
-        if self.game_window and self.game_window.isActive:
+        if self._game_window:
             if mouse_action == MouseAction.mouse_left:
-                if x is not None and y is not None:
+                if x and y:
+                    y -= self.game_window_size[1]
                     pyautogui.moveTo(x, y)
-                pyautogui.click(button='left')
+                self._mouse_controller.click(Button.left)
             elif mouse_action == MouseAction.mouse_right:
-                if x is not None and y is not None:
+                if x and y:
+                    y -= self.game_window_size[1]
                     pyautogui.moveTo(x, y)
-                pyautogui.click(button='right')
+                self._mouse_controller.click(Button.right)
             elif mouse_action == MouseAction.move:
-                if x is not None and y is not None:
-                    pyautogui.moveTo(x, y)
-        else:
-            print("Game window is not active. Unable to perform mouse action.")
+                y -= self.game_window_size[1]
+                pyautogui.moveTo(x, y)
