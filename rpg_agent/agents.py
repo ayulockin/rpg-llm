@@ -7,6 +7,7 @@ from PIL import ImageGrab, Image, ImageDraw
 import pyautogui
 import time
 import os
+from abc import abstractmethod
 
 from openai.types.chat.chat_completion_message_tool_call import Function
 
@@ -19,7 +20,20 @@ from .utils import *
 
 
 class Agent(weave.Model):
-    pass
+    llm: LLMPredictor = LLMPredictor()
+    name: str = "base_agent"
+    model_name: str = "gpt-4o-mini"
+    instruction: str = "You are a helpful agent that can perform actions in the game."
+    tools: list[dict] = []
+    chat_history: list[dict] = []
+
+    def model_post_init(self, __context):
+        self.llm = LLMPredictor(model_name=self.model_name)
+
+    @abstractmethod
+    @weave.op()
+    def predict(self):
+        pass
 
 
 class ScreenshotDescriptionAgent(weave.Model):
