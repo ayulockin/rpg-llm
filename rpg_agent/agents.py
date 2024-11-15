@@ -1,7 +1,7 @@
 import json
 import time
 from abc import abstractmethod
-from typing import Union, Optional
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -12,9 +12,19 @@ from PIL import ImageGrab
 
 from .control_interface import KEYSTROKE_STRING_MAPPING, InputExecutor, KeyStroke
 from .llm_predictor import LLMPredictor
-from .models import Owlv2DetectionModel, UltralyticsDetectionModel
+from .models import (
+    Florence2DetectionModel,
+    Owlv2DetectionModel,
+    UltralyticsDetectionModel,
+)
 from .tools import inventory_agent_tools
-from .utils import *
+from .utils import (
+    draw_bbox,
+    encode_image,
+    get_game_window,
+    parse_json,
+    save_combined_image,
+)
 
 
 class Agent(weave.Model):
@@ -388,6 +398,26 @@ class YOLOScreenshotDetectionAgent(Agent):
 
     def model_post_init(self, __context):
         self.object_detector = UltralyticsDetectionModel(model_name=self.model_name)
+
+    @weave.op()
+    def predict(self):
+        image = get_game_window(use_image_grab=False, monitor_index=2)
+        response = self.object_detector.predict(image=image)
+        return {
+            "game_frame": image,
+            "prediction": response,
+        }
+
+
+class Florence2ScreenshotDetectionAgent(Agent):
+    object_detector: Optional[Florence2DetectionModel] = None
+    model_name: str = "microsoft/Florence-2-large"
+    task_prompt: str = "<DENSE_REGION_CAPTION>"
+
+    def model_post_init(self, __context):
+        self.object_detector = Florence2DetectionModel(
+            model_name=self.model_name, task_prompt=self.task_prompt
+        )
 
     @weave.op()
     def predict(self):
