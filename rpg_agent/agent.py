@@ -18,6 +18,10 @@ from .control_interface import (
 from .utils import *
 
 
+class Agent(weave.Model):
+    pass
+
+
 class ScreenshotDescriptionAgent(weave.Model):
     name: str = "screenshot_description_agent"
     llm: LLMPredictor = LLMPredictor(
@@ -266,14 +270,61 @@ storage agent is responsible for picking the items from the storage units and pu
 6. repeat the process for the next storage unit.
 """
 
+def get_coordinates() -> tuple[int, int]:
+    return 1100, 600
+
+storage_agent_tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "frame_description",
+            "description": "Call this whenever you need to know the current frame of the game. This function takes in no arguments.",
+            "parameters": {},
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "execute_mouse_action",
+            "description": "Call this whenever you need to move the mouse. This function takes in a `MouseAction` enum.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keystroke": {
+                        "type": "string",
+                        "enum": list(KEYSTROKE_STRING_MAPPING.keys()),
+                    }
+                },
+                "required": ["keystroke"],
+            },
+        },
+    },
+]
+
 
 class StorageAgent(weave.Model):
     name: str = "storage_agent"
     llm: LLMPredictor = LLMPredictor(model_name="gpt-4o")
+
+    agent_instruction: str = """
+    You are responsible for picking the items from the storage units and putting them in the inventory. You have to do the following in order. STRICTLY follow the order.
+
+    1. Get the coordinates for the storage unit. You have access to the `get_coordinates` function.
+    2. Click on the storage unit. You have access to the `execute_mouse_action` function.
+    3. If the storage unit is open, use the `frame_description` function to get the description of the storage unit. like how many items are there, what are the items.
+    4. Click on the take all button. You have access to the `execute_mouse_action` function.
+    5. Click on the close button. You have access to the `execute_mouse_action` function.
+    6. Once this task is complete, you should return JUST a valid boolean value: False.
+    """.strip()
+
     frame_prompt: str = """
     You are playing Divinity: Original Sin 2. You are given the frame of the game with the storage unit opened. Please describe the contents of the storage unit in great detail. The storag unit will have a checkboard pattern where each cell will have an item. Tell me the total count of the items and the count of each item.
     """.strip()
     frame_description: ScreenshotDescriptionAgent = ScreenshotDescriptionAgent(prompt=frame_prompt)
+
+    chat_history: list[str] = [
+        {"role": "system", "content": agent_instruction}
+    ]
 
     @weave.op()
     def predict(self):

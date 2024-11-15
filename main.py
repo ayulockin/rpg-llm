@@ -92,6 +92,5 @@ class GameAgent(weave.Model):
 #     llm_frame_description=llm_frame_description
 # )
 
-
-storage_agent = StorageAgent()
-storage_agent.predict()
+# storage_agent = StorageAgent()
+# storage_agent.predict()
