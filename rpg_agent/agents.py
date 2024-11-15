@@ -8,7 +8,7 @@ import numpy as np
 import pyautogui
 import weave
 from openai.types.chat.chat_completion_message_tool_call import Function
-from PIL import ImageGrab
+from PIL import Image, ImageGrab
 
 from .control_interface import KEYSTROKE_STRING_MAPPING, InputExecutor, KeyStroke
 from .llm_predictor import LLMPredictor
@@ -420,9 +420,35 @@ class Florence2ScreenshotDetectionAgent(Agent):
         )
 
     @weave.op()
+    def describe_screenshot(self, image: Image.Image) -> list[str]:
+        response = self.llm.predict(
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are given a screenshot from the role-playing game Divinity: Original Sin 2 game.
+You are suppossed to first analyze the screenshot and then describe the contents of the screenshot in great detail.
+You are only suppossed give the objects present in the screenshot in a comma separated manner and nothing else.
+""",
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": encode_image(image)},
+                        }
+                    ],
+                },
+            ],
+        )
+        return response.choices[0].message.content
+
+    @weave.op()
     def predict(self):
         image = get_game_window(use_image_grab=False, monitor_index=2)
-        response = self.object_detector.predict(image=image)
+        image_description = self.describe_screenshot(image)
+        response = self.object_detector.predict(image=image, prompt=image_description)
         return {
             "game_frame": image,
             "prediction": response,
