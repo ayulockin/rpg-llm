@@ -1,23 +1,23 @@
 import torch
 import weave
 from PIL import Image
-from transformers import AutoProcessor, Owlv2ForObjectDetection
+from transformers import Owlv2ForObjectDetection, Owlv2Processor
 
 
 class Owlv2DetectionModel(weave.Model):
-    model_name: str = "google/owlv2-base-patch16-ensemble"
-    device: str = "mps"
-    _processor: AutoProcessor
+    _processor: Owlv2Processor
     _model: Owlv2ForObjectDetection
 
     def model_post_init(self, __context):
-        self._processor = AutoProcessor.from_pretrained(self.model_name)
-        self._model = Owlv2ForObjectDetection.from_pretrained(self.model_name).to(
-            self.device
+        self._processor = Owlv2Processor.from_pretrained(
+            "google/owlv2-base-patch16-ensemble"
         )
+        self._model = Owlv2ForObjectDetection.from_pretrained(
+            "google/owlv2-base-patch16-ensemble"
+        ).to("cpu")
 
     @weave.op()
-    def predict(self, prompts: list[str], image: Image, threshold: float = 0.5):
+    def predict(self, prompts: list[list[str]], image: Image, threshold: float = 0.5):
         inputs = self._processor(text=prompts, images=image, return_tensors="pt")
         with torch.no_grad():
             outputs = self._model(**inputs)
@@ -25,21 +25,8 @@ class Owlv2DetectionModel(weave.Model):
         results = self._processor.post_process_object_detection(
             outputs=outputs, threshold=threshold, target_sizes=target_sizes
         )
-        result_dict = []
-        for prompt, result in zip(prompts, results):
-            boxes = []
-            for idx, box in enumerate(result["boxes"]):
-                boxes.append(
-                    {
-                        "bbox": box[idx].tolist(),
-                        "confidence": result["scores"][idx].item(),
-                        "label": result["labels"][idx],
-                    }
-                )
-            result_dict.append(
-                {
-                    "prompt": prompt,
-                    "boxes": boxes,
-                }
-            )
-        return result_dict
+        for idx in range(len(results)):
+            results[idx]["boxes"] = results[idx]["boxes"].cpu().tolist()
+            results[idx]["scores"] = results[idx]["scores"].cpu().numpy()
+            results[idx]["labels"] = results[idx]["labels"].cpu().numpy()
+        return results

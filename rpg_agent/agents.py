@@ -373,9 +373,8 @@ class ScreenshotDetectionAgent(Agent):
     object_detector: Owlv2DetectionModel = Owlv2DetectionModel()
 
     @weave.op()
-    def predict(self, prompts: Union[str, list[str]]):
-        prompts = [prompts] if isinstance(prompts, str) else prompts
-        image = get_game_window()
+    def predict(self, prompts: list[list[str]]):
+        image = get_game_window(use_image_grab=False, monitor_index=2)
         response = self.object_detector.predict(prompts=prompts, image=image)
         return {
             "game_frame": image,

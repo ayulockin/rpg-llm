@@ -115,6 +115,6 @@ def get_game_window(use_image_grab: bool = True, monitor_index: int = 2):
         monitors = sct.monitors
         extended_display = monitors[monitor_index]
         screenshot = sct.grab(extended_display)
-        img = Image.frombytes(
+        return Image.frombytes(
             "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"
-    )
+        )
