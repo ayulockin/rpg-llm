@@ -14,7 +14,9 @@ from openai.types.chat.chat_completion_message_tool_call import Function
 from .llm_predictor import LLMPredictor
 from .tools import inventory_agent_tools
 from .control_interface import (
-    KeyStroke, KEYSTROKE_STRING_MAPPING, InputExecutor
+    KeyStroke, KEYSTROKE_STRING_MAPPING, 
+    InputExecutor, 
+    MouseAction, MOUSE_ACTION_STRING_MAPPING
 )
 from .utils import *
 
@@ -149,14 +151,16 @@ storage agent is responsible for picking the items from the storage units and pu
 6. repeat the process for the next storage unit.
 """
 
+
+@weave.op()
 def get_coordinates() -> tuple[int, int]:
-    return 1100, 600
+    return 1200, 560
 
 storage_agent_tools = [
     {
         "type": "function",
         "function": {
-            "name": "frame_description",
+            "name": "screenshot_description_agent",
             "description": "Call this whenever you need to know the current frame of the game. This function takes in no arguments.",
             "parameters": {},
         }
@@ -169,42 +173,109 @@ storage_agent_tools = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "keystroke": {
+                    "mouse_action": {
                         "type": "string",
-                        "enum": list(KEYSTROKE_STRING_MAPPING.keys()),
+                        "enum": ["mouse_left"],
                     }
                 },
-                "required": ["keystroke"],
+                "required": ["mouse_action"],
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_coordinates",
+            "description": "Call this whenever you need to get the coordinates for the storage unit. This function takes in no arguments.",
+            "parameters": {},
+        }
+    }
 ]
 
 
-class StorageAgent(weave.Model):
+class StorageAgent(Agent):
     name: str = "storage_agent"
-    llm: LLMPredictor = LLMPredictor(model_name="gpt-4o")
-
-    agent_instruction: str = """
+    model_name: str = "gpt-4o"
+    tools: list[dict] = storage_agent_tools
+    instruction: str = """
     You are responsible for picking the items from the storage units and putting them in the inventory. You have to do the following in order. STRICTLY follow the order.
 
-    1. Get the coordinates for the storage unit. You have access to the `get_coordinates` function.
-    2. Click on the storage unit. You have access to the `execute_mouse_action` function.
-    3. If the storage unit is open, use the `frame_description` function to get the description of the storage unit. like how many items are there, what are the items.
-    4. Click on the take all button. You have access to the `execute_mouse_action` function.
-    5. Click on the close button. You have access to the `execute_mouse_action` function.
+    1. First get the coordinates for the storage unit. You have access to the `get_coordinates` function. Once you have the coordinates, you can click on the storage unit.
+
+    2. Now click on the storage unit. You have access to the `execute_mouse_action` function.
+
+    3. Assuming the storage unit is open, use the `frame_description` function to get the description of the storage unit - like how many items are there, what are the items.
+
+    4. Now we will take all the items from the storage unit. Click on the take all button. You have access to the `execute_mouse_action` function.
+
+    5. Now click on the close button. You have access to the `execute_mouse_action` function.
+
     6. Once this task is complete, you should return JUST a valid boolean value: False.
+
+    Make sure to do one task at a time.
     """.strip()
 
-    frame_prompt: str = """
+    screenshot_description_prompt: str = """
     You are playing Divinity: Original Sin 2. You are given the frame of the game with the storage unit opened. Please describe the contents of the storage unit in great detail. The storag unit will have a checkboard pattern where each cell will have an item. Tell me the total count of the items and the count of each item.
     """.strip()
-    frame_description: ScreenshotDescriptionAgent = ScreenshotDescriptionAgent(instruction=frame_prompt)
+    screenshot_description_agent: ScreenshotDescriptionAgent = ScreenshotDescriptionAgent(instruction=screenshot_description_prompt)
 
     chat_history: list[str] = [
-        {"role": "system", "content": agent_instruction}
+        {"role": "system", "content": instruction}
     ]
 
     @weave.op()
-    def predict(self):
-        pass
+    def predict(
+        self,
+        executor: InputExecutor,
+    ):
+        max_iterations = 10
+        while True:
+            response = self.llm.predict(
+                messages=self.chat_history,
+                tools=self.tools,
+            )
+            print("The response is: ", response)
+
+            if response.choices[0].message.tool_calls:
+                print("The tool calls are: ", response.choices[0].message.tool_calls)
+                for tool_call in response.choices[0].message.tool_calls:
+                    if tool_call.function.arguments:
+                        arguments = json.loads(tool_call.function.arguments)
+                        print("The arguments are: ", arguments)
+
+                    if tool_call.function.name == "get_coordinates":
+                        print("Getting the coordinates")
+                        coordinates = get_coordinates()
+                        self.chat_history.append(
+                            {"role": "assistant", "content": f"Got the coordinates: {coordinates}"}
+                        )
+
+                    if tool_call.function.name == "execute_mouse_action":
+                        print("Executing the mouse action")
+                        executor.execute_mouse_action(
+                            MouseAction(MOUSE_ACTION_STRING_MAPPING[arguments["mouse_action"]]),
+                            coordinates[0],
+                            coordinates[1],
+                        )
+                        self.chat_history.append(
+                            {"role": "assistant", "content": f"Clicked on the storage unit"}
+                        )
+
+                    if tool_call.function.name == "screenshot_description_agent":
+                        print("Taking the screenshot description")
+                        storage_unit_description = self.screenshot_description_agent.predict()["prediction"]
+                        self.chat_history.append(
+                            {"role": "assistant", "content": f"We gathered the description of the storage unit: {storage_unit_description}"}
+                        )
+
+                    # TODO: handle taking the items and closing the storage unit
+
+            if response.choices[0].message.content == "False":
+                break
+
+            max_iterations -= 1
+            if max_iterations == 0:
+                break
+
+        return self.chat_history

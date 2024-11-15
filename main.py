@@ -26,4 +26,12 @@ screenshot_description_agent = ScreenshotDescriptionAgent()
 
 # Microagent 1: Inventory Agent
 inventory_agent = InventoryAgent()
-print(inventory_agent.predict(executor, screenshot_description_agent))
+# print(inventory_agent.predict(executor, screenshot_description_agent))
+
+# Microagent 2: Storage Agent
+storage_agent = StorageAgent()
+print(storage_agent.predict(executor))
+
+# executor.execute_mouse_action(MouseAction.mouse_left, 1200, 560)
+
+# executor.execute_keystroke(KeyStroke.i)
