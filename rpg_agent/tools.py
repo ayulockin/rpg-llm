@@ -5,7 +5,7 @@ inventory_agent_tools = [
     {
         "type": "function",
         "function": {
-            "name": "llm_frame_description",
+            "name": "screenshot_description_agent",
             "description": "Call this whenever you need to know the current frame of the game. This function takes in no arguments.",
             "parameters": {},
         }
