@@ -1,21 +1,17 @@
-import weave
 import json
-import cv2
-import numpy as np
-import random
-from PIL import ImageGrab, Image, ImageDraw
-import pyautogui
 import time
-import os
 from abc import abstractmethod
 
+import cv2
+import numpy as np
+import pyautogui
+import weave
 from openai.types.chat.chat_completion_message_tool_call import Function
+from PIL import Image, ImageGrab
 
+from .control_interface import KEYSTROKE_STRING_MAPPING, InputExecutor, KeyStroke
 from .llm_predictor import LLMPredictor
 from .tools import inventory_agent_tools
-from .control_interface import (
-    KeyStroke, KEYSTROKE_STRING_MAPPING, InputExecutor
-)
 from .utils import *
 
 
@@ -41,7 +37,8 @@ class ScreenshotDescriptionAgent(weave.Model):
     llm: LLMPredictor = LLMPredictor(
         model_name="gpt-4o-mini",
     )
-    prompt: str = """
+    prompt: str = (
+        """
     We are playing Divinity: Original Sin 2 game. You are provided the current frame of the game. The player or character is likely in the center of the screen. 
     
     We are trying to play this game autonomously thus we need to know what the current state of the game is. Your task is to describe the frame in great detail. Use bullet points and be very specific.
@@ -50,6 +47,7 @@ class ScreenshotDescriptionAgent(weave.Model):
     - Describe the position of the objects of interest with respect to the player or character.
     - Also describe how far the object of interest is from the player or character.
     """.strip()
+    )
 
     @weave.op()
     def predict(self):
@@ -57,20 +55,15 @@ class ScreenshotDescriptionAgent(weave.Model):
 
         response = self.llm.predict(
             messages=[
+                {"role": "system", "content": self.prompt},
                 {
-                    "role": "system", 
-                    "content": self.prompt
-                },
-                {
-                    "role": "user", 
+                    "role": "user",
                     "content": [
                         {
                             "type": "image_url",
-                            "image_url": {
-                                "url": encode_image(image) # utils.py
-                            }
+                            "image_url": {"url": encode_image(image)},  # utils.py
                         }
-                    ]
+                    ],
                 },
             ],
         )
@@ -83,7 +76,8 @@ class ScreenshotDescriptionAgent(weave.Model):
 
 class WhereIsTheCharacterAgent(weave.Model):
     object_detector: LLMPredictor  # it can also be a standard object detection model
-    prompt_task: str = """We need to detect the main character in the frame of the game. We are playing Divinity: Original Sin 2. Please carefully examine the frame and detect the main character with precise bounding boxes that closely enclose the character. 
+    prompt_task: str = (
+        """We need to detect the main character in the frame of the game. We are playing Divinity: Original Sin 2. Please carefully examine the frame and detect the main character with precise bounding boxes that closely enclose the character. 
 
     The frame is 1920x1080 (width, height) with the main character likely to be centered in the screen. The bounding boxes should be non-normalized (pixel values). The detection should be precise and accurate because we will use the detected position to control the character.
 
@@ -91,8 +85,10 @@ class WhereIsTheCharacterAgent(weave.Model):
 
     Frame description: {frame_description}
     """.strip()
+    )
 
-    prompt_instructions: str = """
+    prompt_instructions: str = (
+        """
     Return ONLY a JSON object containing the bounding boxes. 
         
     Example output:
@@ -102,10 +98,11 @@ class WhereIsTheCharacterAgent(weave.Model):
         "confidence": 0.95
     }
     """.strip()
+    )
 
     @weave.op()
     def predict(self, frame_description: str):
-        image = get_game_window() # utils.py
+        image = get_game_window()  # utils.py
 
         system_prompt = self.prompt_task.format(frame_description=frame_description)
         system_prompt += "\n" + self.prompt_instructions
@@ -124,7 +121,7 @@ class WhereIsTheCharacterAgent(weave.Model):
                 "game_frame": image,
                 "prediction_image": draw_bbox(image, bboxes),  # utils.py
                 "prediction": bboxes,
-            }        
+            }
         except json.JSONDecodeError:
             output = {
                 "game_frame": image,
@@ -159,7 +156,10 @@ class HoverDetectionAgent(weave.Model):
         for x in range(x_min, x_max, self.grid_step):
             for y in range(y_min, y_max, self.grid_step):
                 # Skip points within the exclusion zone around the character
-                if abs(x - character_x) < self.exclusion_size // 2 and abs(y - character_y) < self.exclusion_size // 2:
+                if (
+                    abs(x - character_x) < self.exclusion_size // 2
+                    and abs(y - character_y) < self.exclusion_size // 2
+                ):
                     continue
 
                 # Move mouse to the (x, y) position
@@ -167,7 +167,12 @@ class HoverDetectionAgent(weave.Model):
                 time.sleep(0.1)  # Small delay to allow the screen to update
 
                 # Capture a larger region around the pointer (e.g., 80x80 pixels)
-                region = (x - self.crop_size // 2, y - self.crop_size // 2, x + self.crop_size // 2, y + self.crop_size // 2)
+                region = (
+                    x - self.crop_size // 2,
+                    y - self.crop_size // 2,
+                    x + self.crop_size // 2,
+                    y + self.crop_size // 2,
+                )
                 current_frame = ImageGrab.grab(bbox=region)
                 current_frame = cv2.cvtColor(np.array(current_frame), cv2.COLOR_RGB2BGR)
 
@@ -175,13 +180,15 @@ class HoverDetectionAgent(weave.Model):
                 current_edges = cv2.Canny(current_frame, 50, 150)
 
                 # If we have a previous frame, compare it with the current frame
-                if 'previous_edges' in locals():
+                if "previous_edges" in locals():
                     # Calculate absolute difference between edge frames
                     diff = cv2.absdiff(previous_edges, current_edges)
-                    
+
                     # Find contours of the changes
-                    contours, _ = cv2.findContours(diff, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    
+                    contours, _ = cv2.findContours(
+                        diff, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                    )
+
                     # Filter contours by area to reduce noise
                     significant_change = False
                     for contour in contours:
@@ -195,7 +202,14 @@ class HoverDetectionAgent(weave.Model):
                         print(f"Significant change detected at ({x}, {y})")
 
                         # Annotate and save the before and after images side by side
-                        combined_image = save_combined_image(previous_frame, current_frame, x, y, detection_count, self.save_dir)
+                        combined_image = save_combined_image(
+                            previous_frame,
+                            current_frame,
+                            x,
+                            y,
+                            detection_count,
+                            self.save_dir,
+                        )
                         detection_count += 1  # Increment the detection count
 
                 # Update the previous frame edges and current frame
@@ -231,15 +245,11 @@ class InventoryAgent(weave.Model):
     4. Once this task is complete, you should return JUST a valid boolean value: False.
     """
     tools: list[dict] = inventory_agent_tools
-    chat_history: list[str] = [
-        {"role": "system", "content": agent_instruction}
-    ]
+    chat_history: list[str] = [{"role": "system", "content": agent_instruction}]
 
     @weave.op()
     def predict(
-        self,
-        executor: InputExecutor,
-        llm_frame_description: ScreenshotDescriptionAgent
+        self, executor: InputExecutor, llm_frame_description: ScreenshotDescriptionAgent
     ):
         while True:
             response = self.llm.predict(
@@ -259,14 +269,20 @@ class InventoryAgent(weave.Model):
                         KeyStroke(KEYSTROKE_STRING_MAPPING[arguments["keystroke"]])
                     )
                     self.chat_history.append(
-                        {"role": "assistant", "content": "Pressed key: " + arguments["keystroke"]}
+                        {
+                            "role": "assistant",
+                            "content": "Pressed key: " + arguments["keystroke"],
+                        }
                     )
                 elif tool_call.function.name == "llm_frame_description":
                     inventory_description = llm_frame_description.predict()
                     self.chat_history.append(
-                        {"role": "assistant", "content": "We gathered the description of the inventory."}
+                        {
+                            "role": "assistant",
+                            "content": "We gathered the description of the inventory.",
+                        }
                     )
-            
+
             if response.choices[0].message.content == "False":
                 break
 
@@ -284,8 +300,10 @@ storage agent is responsible for picking the items from the storage units and pu
 6. repeat the process for the next storage unit.
 """
 
+
 def get_coordinates() -> tuple[int, int]:
     return 1100, 600
+
 
 storage_agent_tools = [
     {
@@ -294,7 +312,7 @@ storage_agent_tools = [
             "name": "frame_description",
             "description": "Call this whenever you need to know the current frame of the game. This function takes in no arguments.",
             "parameters": {},
-        }
+        },
     },
     {
         "type": "function",
@@ -320,7 +338,8 @@ class StorageAgent(weave.Model):
     name: str = "storage_agent"
     llm: LLMPredictor = LLMPredictor(model_name="gpt-4o")
 
-    agent_instruction: str = """
+    agent_instruction: str = (
+        """
     You are responsible for picking the items from the storage units and putting them in the inventory. You have to do the following in order. STRICTLY follow the order.
 
     1. Get the coordinates for the storage unit. You have access to the `get_coordinates` function.
@@ -330,15 +349,18 @@ class StorageAgent(weave.Model):
     5. Click on the close button. You have access to the `execute_mouse_action` function.
     6. Once this task is complete, you should return JUST a valid boolean value: False.
     """.strip()
+    )
 
-    frame_prompt: str = """
+    frame_prompt: str = (
+        """
     You are playing Divinity: Original Sin 2. You are given the frame of the game with the storage unit opened. Please describe the contents of the storage unit in great detail. The storag unit will have a checkboard pattern where each cell will have an item. Tell me the total count of the items and the count of each item.
     """.strip()
-    frame_description: ScreenshotDescriptionAgent = ScreenshotDescriptionAgent(prompt=frame_prompt)
+    )
+    frame_description: ScreenshotDescriptionAgent = ScreenshotDescriptionAgent(
+        prompt=frame_prompt
+    )
 
-    chat_history: list[str] = [
-        {"role": "system", "content": agent_instruction}
-    ]
+    chat_history: list[str] = [{"role": "system", "content": agent_instruction}]
 
     @weave.op()
     def predict(self):
