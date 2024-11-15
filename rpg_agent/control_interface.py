@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, Union
+from pydantic import BaseModel
 
 import pyautogui
 import pywinctl
@@ -24,6 +25,23 @@ class KeyStroke(Enum):
     l = 0x25  # open log
 
 
+KEYSTROKE_STRING_MAPPING = {
+    "enter": KeyStroke.enter,
+    "command": KeyStroke.command,
+    "escape": KeyStroke.escape,
+    "shift": KeyStroke.shift,
+    "space": KeyStroke.space,
+    "control": KeyStroke.control,
+    "option": KeyStroke.option,
+    "tab": KeyStroke.tab,
+    "i": KeyStroke.i,
+    "f": KeyStroke.f,
+    "g": KeyStroke.g,
+    "k": KeyStroke.k,
+    "l": KeyStroke.l,
+}
+
+
 class MouseAction(Enum):
     mouse_left = "mouse_left"
     mouse_right = "mouse_right"
@@ -31,21 +49,28 @@ class MouseAction(Enum):
 
 
 def press_key(key_code):
+    # Create and post key down event
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, True))
+    # Create and post key up event
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, False))
 
 
-class InputExecutor:
+class InputExecutor(BaseModel):
+    game_window_title: str
+    game_window_size: tuple[int, int]
+    _mouse_controller: Controller
+    _game_window: Optional[Union[MacOSWindow, None]]
 
     def __init__(
         self,
         game_window_title: str = "DOS II",
         game_window_size: tuple[int, int] = (2560, 1440),
     ):
-        self.game_window_title = game_window_title
-        self.game_window_size = game_window_size
-        self.mouse_controller = Controller()
-        self.game_window = self.focus_game_window()
+        super().__init__(
+            game_window_title=game_window_title, game_window_size=game_window_size
+        )
+        self._mouse_controller = Controller()
+        self._game_window = self.focus_game_window()
 
     def focus_game_window(self) -> Union[MacOSWindow, None]:
         try:
@@ -68,7 +93,7 @@ class InputExecutor:
             return None
 
     def execute_keystroke(self, keystroke: KeyStroke) -> None:
-        if self.game_window:
+        if self._game_window:
             press_key(keystroke.value)
 
     def execute_mouse_action(
@@ -76,18 +101,22 @@ class InputExecutor:
         mouse_action: MouseAction,
         x: Optional[int] = None,
         y: Optional[int] = None,
+        click_on_extended_display: bool = False,
     ) -> None:
-        if self.game_window and self.game_window.isActive:
+        if self._game_window:
             if mouse_action == MouseAction.mouse_left:
-                if x is not None and y is not None:
+                if x and y:
+                    if click_on_extended_display:
+                        y -= self.game_window_size[1]
                     pyautogui.moveTo(x, y)
-                pyautogui.click(button='left')
+                self._mouse_controller.click(Button.left)
             elif mouse_action == MouseAction.mouse_right:
-                if x is not None and y is not None:
+                if x and y:
+                    if click_on_extended_display:
+                        y -= self.game_window_size[1]
                     pyautogui.moveTo(x, y)
-                pyautogui.click(button='right')
+                self._mouse_controller.click(Button.right)
             elif mouse_action == MouseAction.move:
-                if x is not None and y is not None:
-                    pyautogui.moveTo(x, y)
-        else:
-            print("Game window is not active. Unable to perform mouse action.")
+                if click_on_extended_display:
+                    y -= self.game_window_size[1]
+                pyautogui.moveTo(x, y)
