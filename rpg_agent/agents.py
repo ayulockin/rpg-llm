@@ -1,6 +1,7 @@
 import json
 import time
 from abc import abstractmethod
+from typing import Union
 
 import cv2
 import numpy as np
@@ -372,9 +373,10 @@ class ScreenshotDetectionAgent(Agent):
     object_detector: Owlv2DetectionModel = Owlv2DetectionModel()
 
     @weave.op()
-    def predict(self):
+    def predict(self, prompts: Union[str, list[str]]):
+        prompts = [prompts] if isinstance(prompts, str) else prompts
         image = get_game_window()
-        response = self.object_detector.predict(prompts=["stairs"], image=image)
+        response = self.object_detector.predict(prompts=prompts, image=image)
         return {
             "game_frame": image,
             "prediction": response,
