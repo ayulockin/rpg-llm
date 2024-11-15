@@ -1,7 +1,7 @@
 import json
 import time
 from abc import abstractmethod
-from typing import Union
+from typing import Union, Optional
 
 import cv2
 import numpy as np
@@ -12,7 +12,7 @@ from PIL import ImageGrab
 
 from .control_interface import KEYSTROKE_STRING_MAPPING, InputExecutor, KeyStroke
 from .llm_predictor import LLMPredictor
-from .models import Owlv2DetectionModel
+from .models import Owlv2DetectionModel, UltralyticsDetectionModel
 from .tools import inventory_agent_tools
 from .utils import *
 
@@ -369,13 +369,30 @@ class StorageAgent(weave.Model):
         pass
 
 
-class ScreenshotDetectionAgent(Agent):
+class OWLScreenshotDetectionAgent(Agent):
     object_detector: Owlv2DetectionModel = Owlv2DetectionModel()
 
     @weave.op()
     def predict(self, prompts: list[list[str]]):
         image = get_game_window(use_image_grab=False, monitor_index=2)
         response = self.object_detector.predict(prompts=prompts, image=image)
+        return {
+            "game_frame": image,
+            "prediction": response,
+        }
+
+
+class YOLOScreenshotDetectionAgent(Agent):
+    object_detector: Optional[UltralyticsDetectionModel] = None
+    model_name: str = "yolo11n"
+
+    def model_post_init(self, __context):
+        self.object_detector = UltralyticsDetectionModel(model_name=self.model_name)
+
+    @weave.op()
+    def predict(self):
+        image = get_game_window(use_image_grab=False, monitor_index=2)
+        response = self.object_detector.predict(image=image)
         return {
             "game_frame": image,
             "prediction": response,
