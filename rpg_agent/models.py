@@ -4,7 +4,7 @@ from PIL import Image
 from transformers import AutoProcessor, Owlv2ForObjectDetection
 
 
-class Owlv2DetectionAgent(weave.Model):
+class Owlv2DetectionModel(weave.Model):
     model_name: str = "google/owlv2-base-patch16-ensemble"
     _processor: AutoProcessor
     _model: Owlv2ForObjectDetection
