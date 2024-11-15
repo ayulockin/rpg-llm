@@ -7,10 +7,11 @@ import numpy as np
 import pyautogui
 import weave
 from openai.types.chat.chat_completion_message_tool_call import Function
-from PIL import Image, ImageGrab
+from PIL import ImageGrab
 
 from .control_interface import KEYSTROKE_STRING_MAPPING, InputExecutor, KeyStroke
 from .llm_predictor import LLMPredictor
+from .models import Owlv2DetectionModel
 from .tools import inventory_agent_tools
 from .utils import *
 
@@ -365,3 +366,16 @@ class StorageAgent(weave.Model):
     @weave.op()
     def predict(self):
         pass
+
+
+class ScreenshotDetectionAgent(Agent):
+    object_detector: Owlv2DetectionModel = Owlv2DetectionModel()
+
+    @weave.op()
+    def predict(self):
+        image = get_game_window()
+        response = self.object_detector.predict(prompts=["stairs"], image=image)
+        return {
+            "game_frame": image,
+            "prediction": response,
+        }
