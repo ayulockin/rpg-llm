@@ -48,6 +48,13 @@ class MouseAction(Enum):
     move = "move"
 
 
+MOUSE_ACTION_STRING_MAPPING = {
+    "mouse_left": MouseAction.mouse_left,
+    "mouse_right": MouseAction.mouse_right, 
+    "move": MouseAction.move
+}
+
+
 def press_key(key_code):
     # Create and post key down event
     CGEventPost(kCGHIDEventTap, CGEventCreateKeyboardEvent(None, key_code, True))
