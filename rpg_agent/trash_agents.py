@@ -5,6 +5,7 @@ import weave
 from .llm_predictor import LLMPredictor
 from .utils import *
 
+
 class WhereIsTheCharacterAgent(weave.Model):
     object_detector: LLMPredictor  # it can also be a standard object detection model
     prompt_task: str = """We need to detect the main character in the frame of the game. We are playing Divinity: Original Sin 2. Please carefully examine the frame and detect the main character with precise bounding boxes that closely enclose the character. 

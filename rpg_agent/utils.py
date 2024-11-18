@@ -1,6 +1,7 @@
 import base64
 import io
 import os
+import cv2 as cv
 import json
 import numpy as np
 
@@ -118,3 +119,52 @@ def get_game_window(use_image_grab: bool = True, monitor_index: int = 2):
         return Image.frombytes(
             "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"
         )
+
+
+def get_template_match(frame: np.ndarray, template_img_path: str, method='TM_SQDIFF_NORMED'):
+    """
+    Perform template matching on an input frame using the provided template image.
+    
+    Args:
+        frame: Input PIL Image or numpy array to search in (grayscale)
+        template_img_path: Path to template image file to search for
+        method: Template matching method to use (default: TM_SQDIFF_NORMED)
+        
+    Returns:
+        dict containing:
+            bbox: Tuple of (top_left, bottom_right) coordinates
+            match_result: The full matching result matrix
+    """
+    print(frame)
+
+    # Convert PIL Image to numpy array if needed
+    if hasattr(frame, 'convert'):
+        frame = np.array(frame.convert('RGB'))
+        frame = cv.cvtColor(frame, cv.COLOR_RGB2BGR)
+        print(frame)
+
+    if isinstance(frame, np.ndarray):
+        frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+
+    # Load and convert template image
+    template_img = cv.imread(template_img_path, cv.IMREAD_GRAYSCALE)
+    assert template_img is not None, "Template image could not be read"
+    
+    # Get template dimensions
+    w, h = template_img.shape[::-1]
+
+    # Get the matching method
+    match_method = getattr(cv, method)
+    
+    # Apply template matching
+    res = cv.matchTemplate(frame, template_img, match_method)
+    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
+    
+    # For TM_SQDIFF/TM_SQDIFF_NORMED, minimum value is best match
+    top_left = min_loc
+    bottom_right = (top_left[0] + w, top_left[1] + h)
+    
+    return {
+        "bbox": (top_left, bottom_right),
+        "match_result": res
+    }

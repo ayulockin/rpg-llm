@@ -17,13 +17,17 @@ from .models import (
     Owlv2DetectionModel,
     UltralyticsDetectionModel,
 )
-from .tools import inventory_agent_tools
+from .tools import (
+    inventory_agent_tools, storage_agent_tools
+)
 from .utils import (
     draw_bbox,
     encode_image,
     get_game_window,
     parse_json,
     save_combined_image,
+    get_template_match,
+)
 from .control_interface import (
     KeyStroke, KEYSTROKE_STRING_MAPPING, 
     InputExecutor, 
@@ -374,9 +378,9 @@ class StorageAgent(Agent):
 
     3. Assuming the storage unit is open, use the `frame_description` function to get the description of the storage unit - like how many items are there, what are the items.
 
-    4. Now we will take all the items from the storage unit. Click on the take all button. You have access to the `execute_mouse_action` function.
+    4. Now we will take all the items from the storage unit. Click on the take all button. To do this you have access to the `get_template_match` function to get the coordinates of the take all button. Once you have the coordinates, you have access to the `execute_mouse_action` function to click on the take all button.
 
-    5. Now click on the close button. You have access to the `execute_mouse_action` function.
+    5. Now click on the close button. To do this you have access to the `get_template_match` function to get the coordinates of the close button. Once you have the coordinates, you have access to the `execute_mouse_action` function to click on the close button.
 
     6. Once this task is complete, you should return JUST a valid boolean value: False.
 
@@ -430,6 +434,7 @@ class StorageAgent(Agent):
                             {"role": "assistant", "content": f"Clicked on the storage unit"}
                         )
 
+                    # TODO: what is the downstream action for this?
                     if tool_call.function.name == "screenshot_description_agent":
                         print("Taking the screenshot description")
                         storage_unit_description = self.screenshot_description_agent.predict()["prediction"]
@@ -438,6 +443,7 @@ class StorageAgent(Agent):
                         )
 
                     # TODO: handle taking the items and closing the storage unit
+
 
             if response.choices[0].message.content == "False":
                 break
