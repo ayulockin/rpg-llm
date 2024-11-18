@@ -20,6 +20,12 @@ dependencies = [
     "isort>=5.13.2",
     "pytest>=8.3.3",
     "ruff>=0.6.8",
+    "transformers>=4.46.2",
+    "torch>=2.5.1",
+    "mss>=9.0.2",
+    "ultralytics>=8.3.31",
+    "timm>=0.9.1",
+    "einops>=0.8.0",
 ]
 
 [tool.pytest.ini_options]
