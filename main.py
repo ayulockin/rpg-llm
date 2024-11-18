@@ -1,6 +1,4 @@
 import weave
-import json
-import time
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -9,11 +7,12 @@ from rpg_agent.agents import (
     ScreenshotDescriptionAgent,
     InventoryAgent,
     StorageAgent,
+    Florence2ScreenshotDetectionAgent,
+    ScreenshotDescriptionAgent
 )
 from rpg_agent.control_interface import InputExecutor, KeyStroke, MouseAction
 from rpg_agent.utils import get_bbox_center
-
-from rpg_agent.agents import ScreenshotDescriptionAgent
+from rpg_agent.llm_predictor import LLMPredictor
 
 
 weave.init(project_name="ml-colabs/rpg-agent")
@@ -32,6 +31,8 @@ inventory_agent = InventoryAgent()
 storage_agent = StorageAgent()
 print(storage_agent.predict(executor))
 
-# executor.execute_mouse_action(MouseAction.mouse_left, 1200, 560)
-
-# executor.execute_keystroke(KeyStroke.i)
+agent = Florence2ScreenshotDetectionAgent(
+    model_name="microsoft/Florence-2-large",
+    llm=LLMPredictor(model_name="gpt-4o"),
+)
+agent.predict()

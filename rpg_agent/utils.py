@@ -4,6 +4,7 @@ import os
 import json
 import numpy as np
 
+import mss
 from PIL import (
     Image, ImageDraw, ImageGrab
 )
@@ -104,7 +105,16 @@ def save_combined_image(before_img, after_img, x, y, count, save_dir):
     return combined_image
 
 
-def get_game_window():
+@weave.op()
+def get_game_window(use_image_grab: bool = True, monitor_index: int = 2):
     """Get the current game window.
     """
-    return ImageGrab.grab() # defaults to whole window capture
+    if use_image_grab:
+        return ImageGrab.grab() # defaults to whole window capture
+    with mss.mss() as sct:
+        monitors = sct.monitors
+        extended_display = monitors[monitor_index]
+        screenshot = sct.grab(extended_display)
+        return Image.frombytes(
+            "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"
+        )
