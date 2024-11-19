@@ -17,13 +17,17 @@ from .models import (
     Owlv2DetectionModel,
     UltralyticsDetectionModel,
 )
-from .tools import inventory_agent_tools
+from .tools import (
+    inventory_agent_tools, storage_agent_tools
+)
 from .utils import (
     draw_bbox,
     encode_image,
     get_game_window,
     parse_json,
     save_combined_image,
+    get_template_match,
+)
 from .control_interface import (
     KeyStroke, KEYSTROKE_STRING_MAPPING, 
     InputExecutor, 
@@ -63,7 +67,6 @@ class ScreenshotDescriptionAgent(Agent):
 
     Be detailed with your description.
     """.strip()
-    )
 
     @weave.op()
     def predict(self):
@@ -317,48 +320,9 @@ storage agent is responsible for picking the items from the storage units and pu
 6. repeat the process for the next storage unit.
 """
 
-
-
 @weave.op()
 def get_coordinates() -> tuple[int, int]:
-    return 1200, 560
-
-
-storage_agent_tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "screenshot_description_agent",
-            "description": "Call this whenever you need to know the current frame of the game. This function takes in no arguments.",
-            "parameters": {},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "execute_mouse_action",
-            "description": "Call this whenever you need to move the mouse. This function takes in a `MouseAction` enum.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "mouse_action": {
-                        "type": "string",
-                        "enum": ["mouse_left"],
-                    }
-                },
-                "required": ["mouse_action"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_coordinates",
-            "description": "Call this whenever you need to get the coordinates for the storage unit. This function takes in no arguments.",
-            "parameters": {},
-        }
-    }
-]
+    return 1100, 540
 
 
 class StorageAgent(Agent):
@@ -382,7 +346,6 @@ class StorageAgent(Agent):
 
     Make sure to do one task at a time.
     """.strip()
-    )
     screenshot_description_prompt: str = """
     You are playing Divinity: Original Sin 2. You are given the frame of the game with the storage unit opened. Please describe the contents of the storage unit in great detail. The storag unit will have a checkboard pattern where each cell will have an item. Tell me the total count of the items and the count of each item.
     """.strip()

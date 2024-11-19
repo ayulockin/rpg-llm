@@ -31,8 +31,10 @@ inventory_agent = InventoryAgent()
 storage_agent = StorageAgent()
 print(storage_agent.predict(executor))
 
-agent = Florence2ScreenshotDetectionAgent(
-    model_name="microsoft/Florence-2-large",
-    llm=LLMPredictor(model_name="gpt-4o"),
-)
-agent.predict()
+# executor.execute_mouse_action(MouseAction.mouse_left, x=1100, y=540)
+
+# agent = Florence2ScreenshotDetectionAgent(
+#     model_name="microsoft/Florence-2-large",
+#     llm=LLMPredictor(model_name="gpt-4o"),
+# )
+# agent.predict()
