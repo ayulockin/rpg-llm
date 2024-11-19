@@ -110,7 +110,11 @@ def get_game_window(use_image_grab: bool = True, monitor_index: int = 2):
     """Get the current game window.
     """
     if use_image_grab:
-        return ImageGrab.grab() # defaults to whole window capture
+        image = ImageGrab.grab() # defaults to whole window capture
+        if image.mode == 'RGBA':
+            image = image.convert('RGB')
+        return image
+
     with mss.mss() as sct:
         monitors = sct.monitors
         extended_display = monitors[monitor_index]
