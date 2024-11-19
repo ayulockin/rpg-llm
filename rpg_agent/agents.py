@@ -10,7 +10,12 @@ import weave
 from openai.types.chat.chat_completion_message_tool_call import Function
 from PIL import Image, ImageGrab
 
-from .control_interface import KEYSTROKE_STRING_MAPPING, InputExecutor, KeyStroke
+from .control_interface import (
+    KEYSTROKE_STRING_MAPPING,
+    InputExecutor,
+    KeyStroke,
+    MouseAction,
+)
 from .llm_predictor import LLMPredictor
 from .models import (
     Florence2DetectionModel,
@@ -429,6 +434,8 @@ class Florence2ScreenshotDetectionAgent(Agent):
 You are given a screenshot from the role-playing game Divinity: Original Sin 2 game.
 You are suppossed to first analyze the screenshot and then describe the contents of the screenshot in great detail.
 You are only suppossed give the objects present in the screenshot in a comma separated manner and nothing else.
+You must also detect the playable character in the screenshot, and exclude them from the list of objects.
+You must also ignore any UI or HUD elements present in the screenshot.
 """,
                 },
                 {
@@ -442,13 +449,22 @@ You are only suppossed give the objects present in the screenshot in a comma sep
                 },
             ],
         )
-        return response.choices[0].message.content
+        return "main character, " + response.choices[0].message.content
 
     @weave.op()
     def predict(self):
         image = get_game_window(use_image_grab=False, monitor_index=2)
         image_description = self.describe_screenshot(image)
         response = self.object_detector.predict(image=image, prompt=image_description)
+        bboxes = response["response"]["<DENSE_REGION_CAPTION>"]["bboxes"]
+        chracter_bbox = bboxes[0]
+        InputExecutor().execute_mouse_action(
+            MouseAction.mouse_left,
+            abs(chracter_bbox[0] - chracter_bbox[2]) // 2,
+            abs(chracter_bbox[1] - chracter_bbox[3]) // 2,
+            click_on_extended_display=True,
+        )
+        time.sleep(0.5)
         return {
             "game_frame": image,
             "prediction": response,
