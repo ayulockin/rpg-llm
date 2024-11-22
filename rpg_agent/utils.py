@@ -54,7 +54,7 @@ def get_bbox_center(bbox):
     Returns:
         tuple: The (x_center, y_center) coordinates of the bounding box center.
     """
-    x_min, y_min, x_max, y_max = bbox
+    (x_min, y_min), (x_max, y_max) = bbox[0], bbox[1]
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     return int(x_center), int(y_center)
@@ -110,7 +110,11 @@ def get_game_window(use_image_grab: bool = True, monitor_index: int = 2):
     """Get the current game window.
     """
     if use_image_grab:
-        return ImageGrab.grab() # defaults to whole window capture
+        image = ImageGrab.grab() # defaults to whole window capture
+        if image.mode == 'RGBA':
+            image = image.convert('RGB')
+        return image
+
     with mss.mss() as sct:
         monitors = sct.monitors
         extended_display = monitors[monitor_index]
@@ -118,3 +122,50 @@ def get_game_window(use_image_grab: bool = True, monitor_index: int = 2):
         return Image.frombytes(
             "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"
         )
+ 
+
+@weave.op()
+def get_template_match(frame: np.ndarray, template_img_path: str, method='TM_SQDIFF_NORMED'):
+    """
+    Perform template matching on an input frame using the provided template image.
+    
+    Args:
+        frame: Input PIL Image or numpy array to search in (grayscale)
+        template_img_path: Path to template image file to search for
+        method: Template matching method to use (default: TM_SQDIFF_NORMED)
+        
+    Returns:
+        dict containing:
+            bbox: Tuple of (top_left, bottom_right) coordinates
+            match_result: The full matching result matrix
+    """
+    # Convert PIL Image to numpy array if needed
+    if hasattr(frame, 'convert'):
+        frame = np.array(frame.convert('RGB'))
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+    if isinstance(frame, np.ndarray):
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Load and convert template image
+    template_img = cv2.imread(template_img_path, cv2.IMREAD_GRAYSCALE)
+    assert template_img is not None, "Template image could not be read"
+    
+    # Get template dimensions
+    w, h = template_img.shape[::-1]
+
+    # Get the matching method
+    match_method = getattr(cv2, method)
+    
+    # Apply template matching
+    res = cv2.matchTemplate(frame, template_img, match_method)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    
+    # For TM_SQDIFF/TM_SQDIFF_NORMED, minimum value is best match
+    top_left = min_loc
+    bottom_right = (top_left[0] + w, top_left[1] + h)
+    
+    return {
+        "bbox": (top_left, bottom_right),
+        "match_result": Image.fromarray((res * 255).astype(np.uint8)),
+    }
