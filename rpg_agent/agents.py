@@ -8,7 +8,7 @@ import numpy as np
 import pyautogui
 import weave
 from openai.types.chat.chat_completion_message_tool_call import Function
-from PIL import Image, ImageGrab
+from PIL import Image, ImageGrab, ImageDraw
 
 from .control_interface import KEYSTROKE_STRING_MAPPING, InputExecutor, KeyStroke
 from .llm_predictor import LLMPredictor
@@ -27,6 +27,7 @@ from .utils import (
     parse_json,
     save_combined_image,
     get_template_match,
+    get_bbox_center,
 )
 from .control_interface import (
     KeyStroke, KEYSTROKE_STRING_MAPPING, 
@@ -71,6 +72,25 @@ class ScreenshotDescriptionAgent(Agent):
     @weave.op()
     def predict(self):
         image = get_game_window()
+
+        # Draw a grid overlay on the image
+        img_with_grid = image.copy()
+        draw = ImageDraw.Draw(img_with_grid)
+
+        # Get image dimensions
+        width, height = image.size
+        
+        # Draw vertical lines
+        grid_size = 100  # Adjust grid size as needed
+        for x in range(0, width, grid_size):
+            draw.line([(x, 0), (x, height)], fill='white', width=1)
+            
+        # Draw horizontal lines    
+        for y in range(0, height, grid_size):
+            draw.line([(0, y), (width, y)], fill='white', width=1)
+            
+        # Use the image with grid overlay
+        image = img_with_grid
 
         response = self.llm.predict(
             messages=[
@@ -322,7 +342,7 @@ storage agent is responsible for picking the items from the storage units and pu
 
 @weave.op()
 def get_coordinates() -> tuple[int, int]:
-    return 1100, 540
+    return [1050, 580]
 
 
 class StorageAgent(Agent):
@@ -336,13 +356,17 @@ class StorageAgent(Agent):
 
     2. Now click on the storage unit. You have access to the `execute_mouse_action` function.
 
-    3. Assuming the storage unit is open, use the `frame_description` function to get the description of the storage unit - like how many items are there, what are the items.
+    3. Assuming the storage unit is open, use the `screenshot_description_agent` function to get the description of the storage unit - like how many items are there, what are the items.
 
-    4. Now we will take all the items from the storage unit. Click on the take all button. You have access to the `execute_mouse_action` function.
+    4. Now to get the coordinates for the `take all` button, use the `get_template_match` function. Pass the path to the `take_all_temp.png` template image.
 
-    5. Now click on the close button. You have access to the `execute_mouse_action` function.
+    5. Now you should have the coordinates of the take all button. Click on the take all button by using the `execute_mouse_action` function. You should have taken the items by now.
 
-    6. Once this task is complete, you should return JUST a valid boolean value: False.
+    6. Now you will close the storage unit. Get the coordinates for the `close` button by using the `get_template_match` function. Pass the path to the `close_temp.png` template image.
+
+    7. Now you should have the coordinates of the close button. Click on the close button by using the `execute_mouse_action` function.
+
+    8. Once this task is complete, you should return JUST a valid boolean value: False.
 
     Make sure to do one task at a time.
     """.strip()
@@ -360,7 +384,9 @@ class StorageAgent(Agent):
         self,
         executor: InputExecutor,
     ):
-        max_iterations = 10
+        max_iterations = 20
+        global_coordinates = []
+        global_execution_dialog = "Clicked on the storage unit"
         while True:
             response = self.llm.predict(
                 messages=self.chat_history,
@@ -377,22 +403,45 @@ class StorageAgent(Agent):
 
                     if tool_call.function.name == "get_coordinates":
                         print("Getting the coordinates")
-                        coordinates = get_coordinates()
+                        global_coordinates = get_coordinates()
+                        print("The global coordinates are: ", global_coordinates)
                         self.chat_history.append(
-                            {"role": "assistant", "content": f"Got the coordinates: {coordinates}"}
+                            {"role": "assistant", "content": f"Got the coordinates: {global_coordinates}"}
                         )
 
                     if tool_call.function.name == "execute_mouse_action":
                         print("Executing the mouse action")
                         executor.execute_mouse_action(
                             MouseAction(MOUSE_ACTION_STRING_MAPPING[arguments["mouse_action"]]),
-                            coordinates[0],
-                            coordinates[1],
+                            global_coordinates[0],
+                            global_coordinates[1],
                         )
                         self.chat_history.append(
-                            {"role": "assistant", "content": f"Clicked on the storage unit"}
+                            {"role": "assistant", "content": global_execution_dialog}
                         )
 
+                    if tool_call.function.name == "get_template_match":
+                        print("Getting the template match")
+                        frame = get_game_window()
+                        template_img_path = arguments["template_img_path"]
+                        template_match = get_template_match(frame, template_img_path)
+                        bbox = template_match["bbox"]
+                        print("The bbox is: ", bbox)
+                        global_coordinates = get_bbox_center(bbox)
+                        print("The global coordinates are: ", global_coordinates)
+
+                        if template_img_path.split("/")[-1] == "take_all_temp.png":
+                            self.chat_history.append(
+                            {
+                                "role": "assistant", 
+                                "content": f"We got the coordinates of the take all button at: {global_coordinates} so that we can click on it using the `execute_mouse_action` function"}
+                            )
+                            global_execution_dialog = "Clicked on the take all button"
+                        elif template_img_path.split("/")[-1] == "close_temp.png":
+                            self.chat_history.append(
+                                {"role": "assistant", "content": f"We got the coordinates of the close button at: {global_coordinates} so that we can click on it using the `execute_mouse_action` function"}
+                            )
+                            global_execution_dialog = "Clicked on the close button. Now I can return JUST a valid boolean value `False` to exit the loop"
                     if tool_call.function.name == "screenshot_description_agent":
                         print("Taking the screenshot description")
                         storage_unit_description = self.screenshot_description_agent.predict()["prediction"]
@@ -462,6 +511,8 @@ class Florence2ScreenshotDetectionAgent(Agent):
 You are given a screenshot from the role-playing game Divinity: Original Sin 2 game.
 You are suppossed to first analyze the screenshot and then describe the contents of the screenshot in great detail.
 You are only suppossed give the objects present in the screenshot in a comma separated manner and nothing else.
+You must also detect the playable character in the screenshot, and exclude them from the list of objects.
+You must also ignore any UI or HUD elements present in the screenshot.
 """,
                 },
                 {
@@ -475,11 +526,11 @@ You are only suppossed give the objects present in the screenshot in a comma sep
                 },
             ],
         )
-        return response.choices[0].message.content
+        return "main character, " +response.choices[0].message.content
 
     @weave.op()
     def predict(self):
-        image = get_game_window(use_image_grab=False, monitor_index=2)
+        image = get_game_window(use_image_grab=True, monitor_index=2)
         image_description = self.describe_screenshot(image)
         response = self.object_detector.predict(image=image, prompt=image_description)
         return {
